@@ -87,20 +87,27 @@ struct lge_touch_attribute {
 	ssize_t (*store)(struct lge_touch_data *ts, const char *buf, size_t count);
 };
 
+struct touch_control_attribute {
+  struct attribute attr;
+  ssize_t (*show)(struct lge_touch_data *ts, char *buf);
+  ssize_t (*store)(struct lge_touch_data *ts,
+        const char *buf, size_t count);
+};
+
 #define LGE_TOUCH_ATTR(_name, _mode, _show, _store)	\
 struct lge_touch_attribute lge_touch_attr_##_name = __ATTR(_name, _mode, _show, _store)
 
 /* Debug mask value
  * usage: echo [debug_mask] > /sys/module/lge_touch_core/parameters/debug_mask
  */
-u32 touch_debug_mask = DEBUG_BASE_INFO;
+u32 touch_debug_mask = 0;
 module_param_named(debug_mask, touch_debug_mask, int, S_IRUGO|S_IWUSR|S_IWGRP);
 
 #ifdef LGE_TOUCH_TIME_DEBUG
 /* Debug mask value
  * usage: echo [debug_mask] > /sys/module/lge_touch_core/parameters/time_debug_mask
  */
-u32 touch_time_debug_mask = DEBUG_TIME_PROFILE_NONE;
+u32 touch_time_debug_mask = 0;
 module_param_named(time_debug_mask, touch_time_debug_mask, int, S_IRUGO|S_IWUSR|S_IWGRP);
 
 #ifdef CUST_G_TOUCH
@@ -2753,6 +2760,7 @@ static ssize_t show_platform_data(struct lge_touch_data *ts, char *buf)
 	ret += sprintf(buf+ret, "\tghost_detection_enable= %d\n", pdata->role->ghost_detection_enable);
 	ret += sprintf(buf+ret, "\tpen_enable			 = %d\n", pdata->role->pen_enable);
 #endif
+        ret += sprintf(buf+ret, "\taccuracy_filter_enable = %d\n",pdata->role->accuracy_filter_enable);
 	ret += sprintf(buf+ret, "pwr:\n");
 	ret += sprintf(buf+ret, "\tuse_regulator         = %d\n", pdata->pwr->use_regulator);
 	ret += sprintf(buf+ret, "\tvdd                   = %s\n", pdata->pwr->vdd);
@@ -2761,6 +2769,120 @@ static ssize_t show_platform_data(struct lge_touch_data *ts, char *buf)
 	ret += sprintf(buf+ret, "\tvio_voltage           = %d\n", pdata->pwr->vio_voltage);
 	ret += sprintf(buf+ret, "\tpower                 = %s\n", pdata->pwr->power ? "YES" : "NO");
 	return ret;
+}
+
+/*
+ * Lets tweak the accuracy filter:
+ *
+ *  @ignore_pressure_gap;
+ *  @touch_max_count;
+ *  @delta_max;
+ *  @max_pressure;
+ *  @direction_count;
+ *  @time_to_max_pressure;
+ *
+ */
+
+//ignore_pressure_gap
+static ssize_t store_ignore_pressure_gap(struct lge_touch_data *ts, const char *buf, size_t count)
+{
+  unsigned int val;
+
+  sscanf(buf, "%d", &val);
+
+  ts->accuracy_filter.ignore_pressure_gap = val;
+
+  return count;
+}
+
+static ssize_t show_ignore_pressure_gap(struct lge_touch_data *ts, char *buf)
+{
+  return sprintf(buf, "%d\n", ts->accuracy_filter.ignore_pressure_gap);
+}
+
+//touch_max_count
+static ssize_t store_touch_max_count(struct lge_touch_data *ts, const char *buf, size_t count)
+{
+  unsigned int val;
+
+  sscanf(buf, "%d", &val);
+
+  ts->accuracy_filter.touch_max_count = val;
+
+  return count;
+}
+
+static ssize_t show_touch_max_count(struct lge_touch_data *ts, char *buf)
+{
+  return sprintf(buf, "%d\n", ts->accuracy_filter.touch_max_count);
+}
+
+//delta_max
+static ssize_t store_delta_max(struct lge_touch_data *ts, const char *buf, size_t count)
+{
+  unsigned int val;
+
+  sscanf(buf, "%d", &val);
+
+  ts->accuracy_filter.delta_max = val;
+
+  return count;
+}
+
+static ssize_t show_delta_max(struct lge_touch_data *ts, char *buf)
+{
+  return sprintf(buf, "%d\n", ts->accuracy_filter.delta_max);
+}
+
+//max_pressure
+static ssize_t store_max_pressure(struct lge_touch_data *ts, const char *buf, size_t count)
+{
+  unsigned int val;
+
+  sscanf(buf, "%d", &val);
+
+  ts->accuracy_filter.max_pressure = val;
+
+  return count;
+}
+
+static ssize_t show_max_pressure(struct lge_touch_data *ts, char *buf)
+{
+  return sprintf(buf, "%d\n", ts->accuracy_filter.max_pressure);
+}
+
+//direction_count
+static ssize_t store_direction_count(struct lge_touch_data *ts, const char *buf, size_t count)
+{
+  unsigned int val;
+
+  sscanf(buf, "%d", &val);
+
+  ts->accuracy_filter.direction_count = val;
+
+  return count;
+}
+
+static ssize_t show_direction_count(struct lge_touch_data *ts, char *buf)
+{
+  return sprintf(buf, "%d\n", ts->accuracy_filter.direction_count);
+}
+
+//time_to_max_pressure
+static ssize_t store_time_to_max_pressure(struct lge_touch_data *ts, const char *buf, size_t count)
+{
+  unsigned int val;
+
+  sscanf(buf, "%d", &val);
+
+  ts->accuracy_filter.time_to_max_pressure = val;
+
+  return count;
+}
+
+static ssize_t show_time_to_max_pressure(struct lge_touch_data *ts, char *buf)
+{
+  return sprintf(buf, "%d\n", ts->accuracy_filter.time_to_max_pressure);
 }
 
 /* show_fw_info
@@ -3470,6 +3592,12 @@ static LGE_TOUCH_ATTR(ghost_detection_enable, S_IRUGO | S_IWUSR, NULL, store_gho
 static LGE_TOUCH_ATTR(pen_enable, S_IRUGO | S_IWUSR, show_pen_enable, NULL);
 static LGE_TOUCH_ATTR(ts_noise, S_IRUGO | S_IWUSR, show_ts_noise, NULL);
 #endif
+static LGE_TOUCH_ATTR(ignore_pressure_gap, S_IRUGO | S_IWUSR, show_ignore_pressure_gap, store_ignore_pressure_gap);
+static LGE_TOUCH_ATTR(touch_max_count, S_IRUGO | S_IWUSR, show_touch_max_count, store_touch_max_count);
+static LGE_TOUCH_ATTR(delta_max, S_IRUGO | S_IWUSR, show_delta_max, store_delta_max);
+static LGE_TOUCH_ATTR(max_pressure, S_IRUGO | S_IWUSR, show_max_pressure, store_max_pressure);
+static LGE_TOUCH_ATTR(direction_count, S_IRUGO | S_IWUSR, show_direction_count, store_direction_count);
+static LGE_TOUCH_ATTR(time_to_max_pressure, S_IRUGO | S_IWUSR, show_time_to_max_pressure, store_time_to_max_pressure);
 
 static struct attribute *lge_touch_attribute_list[] = {
 	&lge_touch_attr_platform_data.attr,
@@ -3494,6 +3622,12 @@ static struct attribute *lge_touch_attribute_list[] = {
 	&lge_touch_attr_pen_enable.attr,
 	&lge_touch_attr_ts_noise.attr,
 #endif
+	&lge_touch_attr_ignore_pressure_gap.attr,
+	&lge_touch_attr_touch_max_count.attr,
+	&lge_touch_attr_delta_max.attr,
+	&lge_touch_attr_max_pressure.attr,
+	&lge_touch_attr_direction_count.attr,
+	&lge_touch_attr_time_to_max_pressure.attr,
 	NULL,
 };
 
@@ -4000,7 +4134,7 @@ int touch_driver_register(struct touch_device_driver* driver)
 
 	touch_device_func = driver;
 
-	touch_wq = create_singlethread_workqueue("touch_wq");
+	touch_wq = create_workqueue("touch_wq");
 	if (!touch_wq) {
 		TOUCH_ERR_MSG("CANNOT create new workqueue\n");
 		ret = -ENOMEM;
