@@ -80,3 +80,4 @@ obj-$(CONFIG_SLIMPORT_ANX7808)	+= slimport_anx7808/
 obj-$(CONFIG_BU52031NVX) += pm8xxx-cradle.o
 obj-$(CONFIG_LGE_FTT_CHARGER) += ftt-charger.o
 obj-$(CONFIG_GAMMA_CONTROL) += gamma_control.o
+obj-$(CONFIG_FSYNC_CONTROL)  += fsync_control.o
