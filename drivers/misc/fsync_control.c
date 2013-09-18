@@ -11,6 +11,8 @@
 #include <linux/device.h>
 #include <linux/miscdevice.h>
 #include <linux/stat.h>
+#include <linux/module.h>
+
 #define FSYNCCONTROL_VERSION 1
 
 static bool fsync_enabled = true;
