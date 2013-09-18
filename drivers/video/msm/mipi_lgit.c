@@ -31,7 +31,7 @@ static struct dsi_buf lgit_tx_buf;
 static struct dsi_buf lgit_rx_buf;
 static int __init mipi_lgit_lcd_init(void);
 
-#ifdef CONFIG_GAMMA_CONTROL
+#if defined(CONFIG_GAMMA_CONTROL) || defined(CONFIG_FAUX_GAMMA)
 struct dsi_cmd_desc new_color_vals[33];
 #endif
 
@@ -103,7 +103,7 @@ int mipi_lgit_lcd_ief_on(void)
 
 	printk(KERN_INFO "%s: mipi lgit lcd on started \n", __func__);
 	MIPI_OUTP(MIPI_DSI_BASE + 0x38, 0x10000000);
-#ifdef CONFIG_GAMMA_CONTROL
+#if defined(CONFIG_GAMMA_CONTROL) || defined(CONFIG_FAUX_GAMMA)
   cnt = mipi_dsi_cmds_tx(&lgit_tx_buf,
     new_color_vals,
     mipi_lgit_pdata->power_on_set_size_1);
@@ -237,22 +237,213 @@ static void mipi_lgit_set_backlight_board(struct msm_fb_data_type *mfd)
 	mipi_lgit_pdata->backlight_level(level, 0, 0);
 }
 
+#ifdef CONFIG_FAUX_GAMMA
+static bool calc_checksum(int intArr[]) {
+  int i = 0;
+  unsigned char chksum = 0;
+
+  if (intArr[5] > 31 || (intArr[6] > 31)) {
+    pr_info("gamma 0 and gamma 1 values can't be over 31, got %d %d instead!", intArr[5], intArr[6]);
+    return false;
+  }
+
+  for (i=1; i<10; i++) {
+    if (intArr[i] > 255) {
+      pr_info("color values  can't be over 255, got %d instead!", intArr[i]);
+      return false;
+    } 
+    chksum += intArr[i];
+ }
+  if (chksum == (unsigned char)intArr[0]) {
+    return true;
+  } else {
+    pr_info("expecting %d, got %d instead!", chksum, intArr[0]); 
+    return false;
+  }
+}
+
+/******************* begin sysfs interface *******************/
+
+static ssize_t kgamma_r_store(struct device *dev, struct device_attribute *attr,
+                              const char *buf, size_t count)
+{
+  int kgamma[10];
+  int i;
+    
+  sscanf(buf, "%d %d %d %d %d %d %d %d %d %d",
+           &kgamma[0], &kgamma[1], &kgamma[2], &kgamma[3],
+           &kgamma[4], &kgamma[5], &kgamma[6], &kgamma[7],
+           &kgamma[8], &kgamma[9]);
+
+  if (calc_checksum(kgamma)) {
+    kgamma[0] = 0xd0;
+    for (i=0; i<10; i++) {
+      pr_info("kgamma_r_p [%d] => %d \n", i, kgamma[i]);
+      new_color_vals[5].payload[i] = kgamma[i];
+    }
+
+    kgamma[0] = 0xd1;
+    for (i=0; i<10; i++) {
+      pr_info("kgamma_r_n [%d] => %d \n", i, kgamma[i]);
+      new_color_vals[6].payload[i] = kgamma[i];
+    }
+  }
+  return count;
+}
+
+static ssize_t kgamma_r_show(struct device *dev, struct device_attribute *attr,
+                             char *buf)
+{
+  int kgamma[10];
+  int i;
+    
+  for (i=0; i<10; i++)
+    kgamma[i] = new_color_vals[5].payload[i];
+    
+  return sprintf(buf, "%d %d %d %d %d %d %d %d %d %d",
+                   kgamma[0], kgamma[1], kgamma[2], kgamma[3],
+                   kgamma[4], kgamma[5], kgamma[6], kgamma[7],
+                   kgamma[8], kgamma[9]);
+}
+
+static ssize_t kgamma_g_store(struct device *dev, struct device_attribute *attr,
+                              const char *buf, size_t count)
+{
+  int kgamma[10];
+  int i;
+    
+  sscanf(buf, "%d %d %d %d %d %d %d %d %d %d",
+           &kgamma[0], &kgamma[1], &kgamma[2], &kgamma[3],
+           &kgamma[4], &kgamma[5], &kgamma[6], &kgamma[7],
+           &kgamma[8], &kgamma[9]);
+    
+  if (calc_checksum(kgamma)) {
+    kgamma[0] = 0xd2;
+    for (i=0; i<10; i++) {
+      pr_info("kgamma_g_p [%d] => %d \n", i, kgamma[i]);
+      new_color_vals[7].payload[i] = kgamma[i];
+    }
+        
+    kgamma[0] = 0xd3;
+    for (i=0; i<10; i++) {
+      pr_info("kgamma_g_n [%d] => %d \n", i, kgamma[i]);
+      new_color_vals[8].payload[i] = kgamma[i];
+    }
+  }
+  return count;
+}
+
+static ssize_t kgamma_g_show(struct device *dev, struct device_attribute *attr,
+                             char *buf)
+{
+  int kgamma[10];
+  int i;
+    
+  for (i=0; i<10; i++)
+    kgamma[i] = new_color_vals[7].payload[i];
+    
+  return sprintf(buf, "%d %d %d %d %d %d %d %d %d %d",
+                   kgamma[0], kgamma[1], kgamma[2], kgamma[3],
+                   kgamma[4], kgamma[5], kgamma[6], kgamma[7],
+                   kgamma[8], kgamma[9]);
+}
+
+static ssize_t kgamma_b_store(struct device *dev, struct device_attribute *attr,
+                              const char *buf, size_t count)
+{
+  int kgamma[10];
+  int i;
+
+ sscanf(buf, "%d %d %d %d %d %d %d %d %d %d",
+           &kgamma[0], &kgamma[1], &kgamma[2], &kgamma[3],
+           &kgamma[4], &kgamma[5], &kgamma[6], &kgamma[7],
+           &kgamma[8], &kgamma[9]);
+
+  if (calc_checksum(kgamma)) {
+    kgamma[0] = 0xd4;
+    for (i=0; i<10; i++) {
+      pr_info("kgamma_b_p [%d] => %d \n", i, kgamma[i]);
+      new_color_vals[9].payload[i] = kgamma[i];
+}
+
+    kgamma[0] = 0xd5;
+    for (i=0; i<10; i++) {
+      pr_info("kgamma_b_n [%d] => %d \n", i, kgamma[i]);
+      new_color_vals[10].payload[i] = kgamma[i];
+    }
+  }
+  return count;
+}
+
+static ssize_t kgamma_b_show(struct device *dev, struct device_attribute *attr,
+                             char *buf)
+{
+  int kgamma[10];
+  int i;
+
+  for (i=0; i<10; i++)
+    kgamma[i] = new_color_vals[9].payload[i];
+
+  return sprintf(buf, "%d %d %d %d %d %d %d %d %d %d",
+                   kgamma[0], kgamma[1], kgamma[2], kgamma[3],
+                   kgamma[4], kgamma[5], kgamma[6], kgamma[7],
+                   kgamma[8], kgamma[9]);
+}
+
+static ssize_t kgamma_ctrl_store(struct device *dev,
+                                 struct device_attribute *attr, const char *buf, size_t count)
+{
+    pr_info("kgamma_ctrl count: %d\n", count); 
+  return count;
+}
+
+static ssize_t kgamma_ctrl_show(struct device *dev,
+                                struct device_attribute *attr, char *buf)
+{
+  return 0;
+}
+
+static DEVICE_ATTR(kgamma_r, 0644, kgamma_r_show, kgamma_r_store);
+static DEVICE_ATTR(kgamma_g, 0644, kgamma_g_show, kgamma_g_store);
+static DEVICE_ATTR(kgamma_b, 0644, kgamma_b_show, kgamma_b_store);
+static DEVICE_ATTR(kgamma_ctrl, 0644, kgamma_ctrl_show, kgamma_ctrl_store);
+
+/******************* end sysfs interface *******************/
+#endif
+
 static int mipi_lgit_lcd_probe(struct platform_device *pdev)
 {
+	int rc;
 	if (pdev->id == 0) {
 		mipi_lgit_pdata = pdev->dev.platform_data;
 		return 0;
 	}
 
-#ifdef CONFIG_GAMMA_CONTROL
+#if defined(CONFIG_GAMMA_CONTROL) || defined(CONFIG_FAUX_GAMMA)
 	memcpy((void *) new_color_vals, (void *) mipi_lgit_pdata->power_on_set_1, sizeof(new_color_vals));
 #endif
 	printk(KERN_INFO "%s: mipi lgit lcd probe start\n", __func__);
 
 	msm_fb_add_device(pdev);
 
+#ifdef CONFIG_FAUX_GAMMA
+ rc = device_create_file(&pdev->dev, &dev_attr_kgamma_r);
+     if(rc !=0)
+         return -1;
+     rc = device_create_file(&pdev->dev, &dev_attr_kgamma_g);
+     if(rc !=0)
+         return -1;
+     rc = device_create_file(&pdev->dev, &dev_attr_kgamma_b);
+     if(rc !=0)
+         return -1;
+     rc = device_create_file(&pdev->dev, &dev_attr_kgamma_ctrl);
+     if(rc !=0)
+         return -1; 
+#endif
+
 	return 0;
 }
+
 
 #ifdef CONFIG_GAMMA_CONTROL
 

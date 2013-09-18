@@ -1011,6 +1011,13 @@ if FB_MSM_MDSS
 endif
 endif
 
+config FAUX_GAMMA
+  tristate "Faux123's Mako Gamma Control"
+  default y
+  help
+    This adds full support for Gamma screen tweaking on
+    Mako.
+
 config LGE_HDMI_NO_SWITCH_STATE_SET
     bool "STATE SET"
     default n
