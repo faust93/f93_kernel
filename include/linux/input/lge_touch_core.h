@@ -15,6 +15,8 @@
  *
  */
 
+#include <linux/earlysuspend.h>
+
 #ifndef LGE_TOUCH_CORE_H
 #define LGE_TOUCH_CORE_H
 
@@ -429,6 +431,36 @@ enum{
 	TIME_EX_PROFILE_MAX
 };
 #endif
+
+struct lge_touch_data
+{
+	void*			h_touch;
+	atomic_t		next_work;
+	atomic_t		device_init;
+	u8				work_sync_err_cnt;
+	u8				ic_init_err_cnt;
+	volatile int	curr_pwr_state;
+	int				int_pin_state;
+	struct i2c_client 			*client;
+	struct input_dev 			*input_dev;
+	struct hrtimer 				timer;
+	struct work_struct  		work;
+	struct delayed_work			work_init;
+	struct delayed_work			work_touch_lock;
+	struct work_struct  		work_fw_upgrade;
+	struct early_suspend		early_suspend;
+	struct touch_platform_data 	*pdata;
+	struct touch_data			ts_data;
+	struct touch_fw_info		fw_info;
+	struct section_info			st_info;
+	struct kobject 				lge_touch_kobj;
+	struct ghost_finger_ctrl	gf_ctrl;
+	struct jitter_filter_info	jitter_filter;
+	struct accuracy_filter_info	accuracy_filter;
+#ifdef PRESSURE_DIFF
+	struct pressure_diff_info	pressure_diff;
+#endif
+};
 
 #define LGE_TOUCH_NAME		"lge_touch"
 
