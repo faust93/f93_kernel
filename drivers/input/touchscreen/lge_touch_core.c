@@ -960,7 +960,10 @@ static int touch_asb_input_report(struct lge_touch_data *ts, int status)
 					input_report_abs(ts->input_dev, ABS_MT_TRACKING_ID, id);
 
 #ifdef CONFIG_TOUCHSCREEN_SWEEP2WAKE
+	  	      if(s2w_switch > 0)
                         detect_sweep2wake(ts->ts_data.curr_data[id].x_position, ts->ts_data.curr_data[id].y_position, ts);
+	  	      if(dt2w_switch && scr_suspended)	
+	  	  	detect_doubletap2wake(ts->ts_data.curr_data[id].x_position, ts->ts_data.curr_data[id].y_position);
 #endif
 
 #if defined(MT_PROTOCOL_A)
@@ -2517,7 +2520,7 @@ static void touch_fw_upgrade_func(struct work_struct *work_fw_upgrade)
 #endif
 
 #ifdef CONFIG_TOUCHSCREEN_SWEEP2WAKE
-                if (s2w_switch == 0)
+                if (s2w_switch == 0 && dt2w_switch == 0)
 #endif
 	touch_power_cntl(ts, POWER_OFF);
 
@@ -3755,6 +3758,10 @@ static ssize_t lge_touch_sweep2wake_store(struct device *dev,
       pr_info("%s: disabled\n", __FUNCTION__);
       s2w_switch = data;
     }
+    else if (data == 2) {
+      pr_info("%s: s2s enabled\n", __FUNCTION__);
+      s2w_switch = data;
+    }
     else
       pr_info("%s: bad value: %u\n", __FUNCTION__, data);
   } else
@@ -3762,8 +3769,34 @@ static ssize_t lge_touch_sweep2wake_store(struct device *dev,
   return count;
 }
 
+static ssize_t lge_touch_doubletap2wake_show(struct device *dev, struct device_attribute *attr, char *buf)
+{
+    size_t count = 0;
+
+    if (dt2w_switch == dt2w_switch_temp)
+	count += sprintf(buf, "%d\n", dt2w_switch);
+    else
+	count += sprintf(buf, "%d->%d\n", dt2w_switch, dt2w_switch_temp);
+    return count;
+}
+
+static ssize_t lge_touch_doubletap2wake_store(struct device *dev, struct device_attribute *attr, const char *buf, size_t count)
+{
+    if (buf[0] >= '0' && buf[0] <= '1' && buf[1] == '\n')
+    if (dt2w_switch != buf[0] - '0') {
+    dt2w_switch_temp = buf[0] - '0';
+    if (!scr_suspended)
+	dt2w_switch = dt2w_switch_temp;
+    else
+	dt2w_changed = 1;
+    }
+    return count;
+}
+
 static DEVICE_ATTR(sweep2wake, (S_IWUSR|S_IRUGO),
   lge_touch_sweep2wake_show, lge_touch_sweep2wake_store);
+static DEVICE_ATTR(doubletap2wake, (S_IWUSR|S_IRUGO),
+  lge_touch_doubletap2wake_show, lge_touch_doubletap2wake_store);
 #endif
 
 static struct kobject *android_touch_kobj;
@@ -3784,6 +3817,12 @@ static int lge_touch_sysfs_init(void)
     printk(KERN_ERR "%s: sysfs_create_file failed\n", __func__);
     return ret;
   }
+  ret = sysfs_create_file(android_touch_kobj, &dev_attr_doubletap2wake.attr);
+  if (ret) {
+    printk(KERN_ERR "%s: sysfs_create_file failed\n", __func__);
+    return ret;
+  }
+
 #endif
   return 0 ;
 }
@@ -3792,6 +3831,7 @@ static void lge_touch_sysfs_deinit(void)
 {
 #ifdef CONFIG_TOUCHSCREEN_SWEEP2WAKE
   sysfs_remove_file(android_touch_kobj, &dev_attr_sweep2wake.attr);
+  sysfs_remove_file(android_touch_kobj, &dev_attr_doubletap2wake.attr);
 #endif
   kobject_del(android_touch_kobj);
 }
@@ -4169,7 +4209,7 @@ static void touch_early_suspend(struct early_suspend *h)
 #endif
 
 #ifdef CONFIG_TOUCHSCREEN_SWEEP2WAKE
-        if (s2w_switch == 0)
+        if (s2w_switch == 0 && dt2w_switch == 0)
 #endif
 	{
 	if (ts->pdata->role->operation_mode)
@@ -4192,7 +4232,7 @@ static void touch_early_suspend(struct early_suspend *h)
 	touch_power_cntl(ts, ts->pdata->role->suspend_pwr);
 	}
 #ifdef CONFIG_TOUCHSCREEN_SWEEP2WAKE
-        else if (s2w_switch > 0) {
+        else if (s2w_switch > 0 || dt2w_switch > 0) {
         release_all_ts_event(ts);
         enable_irq_wake(ts->client->irq); 
         }
@@ -4219,7 +4259,7 @@ static void touch_late_resume(struct early_suspend *h)
 	}
 
 #ifdef CONFIG_TOUCHSCREEN_SWEEP2WAKE
-        if (s2w_switch == 0)
+        if (s2w_switch == 0 && dt2w_switch == 0)
 #endif
         { 
 	touch_power_cntl(ts, ts->pdata->role->resume_pwr);
@@ -4242,7 +4282,7 @@ static void touch_late_resume(struct early_suspend *h)
 		queue_delayed_work(touch_wq, &ts->work_init, 0);
 	}
 #ifdef CONFIG_TOUCHSCREEN_SWEEP2WAKE
-        else if (s2w_switch > 0) {
+        else if (s2w_switch > 0 || dt2w_switch > 0) {
 	disable_irq_wake(ts->client->irq);
 	 /* Interrupt pin check after IC init - avoid Touch lockup */
 	if (ts->pdata->role->operation_mode == INTERRUPT_MODE) {
