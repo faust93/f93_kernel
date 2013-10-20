@@ -353,9 +353,14 @@ CC		= $(srctree)/scripts/gcc-wrapper.py $(REAL_CC)
 
 CHECKFLAGS     := -D__linux__ -Dlinux -D__STDC__ -Dunix -D__unix__ \
                   -Wbitwise -Wno-return-void $(CF)
-OPTIMIZATION_FLAGS = -march=armv7-a -mtune=cortex-a15 -mfpu=neon \
-                     -ffast-math -fsingle-precision-constant \
-                     -fgcse-lm -fgcse-sm -fsched-spec-load -fforce-addr
+#OPTIMIZATION_FLAGS = -march=armv7-a -mtune=cortex-a15 -mfpu=neon \
+#                     -ffast-math -fsingle-precision-constant \
+#                     -fgcse-lm -fgcse-sm -fsched-spec-load -fforce-addr
+
+OPTIMIZATION_FLAGS  = -fgcse-lm -fgcse-sm -fsched-spec-load \
+	    -fforce-addr -ffast-math -fsingle-precision-constant \
+	     -mcpu=cortex-a9 -mtune=cortex-a15 -marm -march=armv7-a -mfpu=neon -funsafe-math-optimizations -ftree-vectorize -funroll-loops
+
 CFLAGS_MODULE   = $(OPTIMIZATION_FLAGS)
 AFLAGS_MODULE   = $(OPTIMIZATION_FLAGS) 
 
@@ -575,7 +580,8 @@ endif # $(dot-config)
 # Defaults to vmlinux, but the arch makefile usually adds further targets
 all: vmlinux
 
-KBUILD_CFLAGS	+= -O3
+KBUILD_CFLAGS += -O3 -fmodulo-sched -fmodulo-sched-allow-regmoves -fno-tree-vectorize
+#KBUILD_CFLAGS	+= -Os
 
 ifdef CONFIG_CC_OPTIMIZE_FOR_SIZE
 KBUILD_CFLAGS	+= -Os
