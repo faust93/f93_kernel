@@ -2303,7 +2303,11 @@ static int get_prop_batt_status(struct pm8921_chg_chip *chip)
 #endif
 
 	if (chip->ext_psy) {
+#ifdef CONFIG_BLX
+        if (get_prop_batt_capacity(chip) >= get_charginglimit())
+#else
 		if (chip->ext_charge_done)
+#endif
 			return POWER_SUPPLY_STATUS_FULL;
 		if (chip->ext_charging)
 			return POWER_SUPPLY_STATUS_CHARGING;
@@ -4763,7 +4767,7 @@ static int is_charging_finished(struct pm8921_chg_chip *chip,
 	int regulation_loop, fast_chg, vcp;
 	int rc;
 	static int last_vbat_programmed = -EINVAL;
-
+	
 	if (!is_ext_charging(chip)) {
 		/* return if the battery is not being fastcharged */
 		fast_chg = pm_chg_get_rt_status(chip, FASTCHG_IRQ);
@@ -4778,9 +4782,9 @@ static int is_charging_finished(struct pm8921_chg_chip *chip,
 
 		vbatdet_low = pm_chg_get_rt_status(chip, VBATDET_LOW_IRQ);
 		pr_debug("vbatdet_low = %d\n", vbatdet_low);
-		if (vbatdet_low == 1)
-			return CHG_IN_PROGRESS;
-
+		if (vbatdet_low ==  1)
+		    return CHG_IN_PROGRESS;
+		
 		/* reset count if battery is hot/cold */
 		rc = pm_chg_get_rt_status(chip, BAT_TEMP_OK_IRQ);
 		pr_debug("batt_temp_ok = %d\n", rc);
@@ -4877,19 +4881,19 @@ static int is_charging_finished(struct pm8921_chg_chip *chip,
 			return CHG_IN_PROGRESS;
 		}
 #endif
-
 		regulation_loop = pm_chg_get_regulation_loop(chip);
 		if (regulation_loop < 0) {
 			pr_err("couldnt read the regulation loop err=%d\n",
 				regulation_loop);
 			return CHG_IN_PROGRESS;
 		}
+
 		pr_debug("regulation_loop=%d\n", regulation_loop);
 
 		if (regulation_loop != 0 && regulation_loop != VDD_LOOP)
 			return CHG_IN_PROGRESS;
 	} /* !is_ext_charging */
-
+	
 	/* reset count if battery chg current is more than iterm */
 	rc = pm_chg_iterm_get(chip, &iterm_programmed);
 	if (rc) {
@@ -5009,8 +5013,11 @@ static void eoc_worker(struct work_struct *work)
 		wake_unlock(&chip->eoc_wake_lock);
 		return;
 	}
-
+#ifdef CONFIG_BLX
+	if (end == CHG_FINISHED || get_prop_batt_capacity(chip) >= get_charginglimit()) {
+#else
 	if (end == CHG_FINISHED) {
+#endif
 		count++;
 	} else {
 		count = 0;
@@ -5042,14 +5049,20 @@ static void eoc_worker(struct work_struct *work)
 		}
 #endif
 		pm_chg_auto_enable(chip, 0);
-
+#ifdef CONFIG_BLX
+		if (is_ext_charging(chip) || get_prop_batt_capacity(chip) >= get_charginglimit())
+#else
 		if (is_ext_charging(chip))
+#endif
 			chip->ext_charge_done = true;
+//#ifdef CONFIG_BLX
 
+//#else
 		if (chip->is_bat_warm || chip->is_bat_cool)
 			chip->bms_notify.is_battery_full = 0;
 		else
 			chip->bms_notify.is_battery_full = 1;
+//#endif
 		/* declare end of charging by invoking chgdone interrupt */
 		chgdone_irq_handler(chip->pmic_chg_irq[CHGDONE_IRQ], chip);
 #ifdef CONFIG_LGE_PM
